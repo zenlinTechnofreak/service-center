@@ -34,13 +34,13 @@ const (
 
 // tickHandler Timed task handler
 func (s *Server) tickHandler(ctx context.Context) {
-	allMapping := s.storage.GetAllMapping()
+	allMapping := s.etcd.GetAllMappings()
 	currData, err := s.dataCenter.GetSyncData(allMapping)
 	if err != nil {
 		log.Errorf(err, "Get sync data from datacenter failed: %s", err)
 		return
 	}
-	s.storage.SaveSyncData(currData)
+	s.etcd.SaveSyncData(currData)
 	data, _ := proto.Marshal(&pb.Member{
 		NodeName: s.conf.NodeName,
 		RPCPort:  int32(s.conf.RPCPort),
@@ -56,7 +56,7 @@ func (s *Server) tickHandler(ctx context.Context) {
 
 // GetData Sync Data to GRPC
 func (s *Server) GetData() *pb.SyncData {
-	return s.storage.GetSyncData()
+	return s.etcd.GetSyncData()
 }
 
 // HandleEvent Handles events from serf
@@ -85,6 +85,10 @@ func (s *Server) userEvent(event serf.UserEvent) {
 
 	// Get member information and get synchronized data from it
 	member := s.agent.Member(m.NodeName)
+	if member == nil{
+		log.Warn("Get member from serf memberlist failed")
+		return
+	}
 
 	cli := grpc.GetClient(fmt.Sprintf("%s:%d", member.Addr, m.RPCPort))
 	data, err := cli.Pull(context.Background())
@@ -93,7 +97,7 @@ func (s *Server) userEvent(event serf.UserEvent) {
 		return
 	}
 
-	mapping := s.storage.GetSyncMapping(m.NodeName)
+	mapping := s.etcd.GetSyncMappings(m.NodeName)
 
 	mapping, err = s.dataCenter.SetSyncData(data, mapping)
 	if err != nil {
@@ -101,7 +105,7 @@ func (s *Server) userEvent(event serf.UserEvent) {
 		return
 	}
 
-	s.storage.SaveSyncMapping(m.NodeName, mapping)
+	s.etcd.SaveSyncMappings(m.NodeName, mapping)
 }
 
 // queryEvent Handles "EventQuery" query events and respond if conditions are met

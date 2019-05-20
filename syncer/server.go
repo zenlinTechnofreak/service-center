@@ -27,13 +27,13 @@ import (
 	"github.com/apache/servicecomb-service-center/pkg/log"
 	"github.com/apache/servicecomb-service-center/syncer/config"
 	"github.com/apache/servicecomb-service-center/syncer/datacenter"
+	"github.com/apache/servicecomb-service-center/syncer/etcd"
 	"github.com/apache/servicecomb-service-center/syncer/grpc"
 	"github.com/apache/servicecomb-service-center/syncer/pkg/syssig"
 	"github.com/apache/servicecomb-service-center/syncer/pkg/ticker"
 	"github.com/apache/servicecomb-service-center/syncer/pkg/utils"
 	"github.com/apache/servicecomb-service-center/syncer/plugins"
 	"github.com/apache/servicecomb-service-center/syncer/serf"
-	"github.com/apache/servicecomb-service-center/syncer/storage"
 )
 
 // Server struct for syncer
@@ -47,7 +47,7 @@ type Server struct {
 	// Wrap the datacenter
 	dataCenter datacenter.DataCenter
 
-	storage *storage.Storage
+	etcd *etcd.Agent
 
 	// Wraps the serf agent
 	agent *serf.Agent
@@ -74,7 +74,7 @@ func (s *Server) Run(ctx context.Context) {
 
 	s.agent.RegisterEventHandler(s)
 
-	// Start serf/grpc/tick services
+	// Start etcd/serf/grpc/tick services
 	s.startServers(ctx)
 
 	s.waitQuit(ctx)
@@ -99,8 +99,8 @@ func (s *Server) Stop() {
 		s.grpc.Stop()
 	}
 
-	if s.storage != nil {
-		s.storage.Stop()
+	if s.etcd != nil {
+		s.etcd.Stop()
 	}
 
 	// Closes all goroutines in the pool
@@ -115,7 +115,7 @@ func (s *Server) initPlugin() {
 
 // initialization Initialize the starter of the syncer
 func (s *Server) initialization() (err error) {
-	s.storage = storage.New()
+	s.etcd = etcd.NewAgent(etcd.DefaultConfig())
 
 	s.tick = ticker.NewTaskTicker(s.conf.TickerInterval, s.tickHandler)
 
@@ -135,6 +135,12 @@ func (s *Server) initialization() (err error) {
 
 // startServers Start all internal services
 func (s *Server) startServers(ctx context.Context) {
+	err := s.etcd.Run()
+	if err != nil {
+		log.Error("start etcd failed", err)
+		return
+	}
+
 	// start serf agent service to wait for
 	s.agent.Start(ctx)
 

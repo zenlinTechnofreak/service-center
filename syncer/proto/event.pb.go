@@ -14,6 +14,7 @@ It has these top-level messages:
 	PullRequest
 	SyncService
 	SyncData
+	SyncMapping
 */
 package proto
 

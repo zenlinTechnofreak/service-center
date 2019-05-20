@@ -22,23 +22,29 @@ import (
 )
 
 // exclude find out services data belonging to self
-func (s *store) exclude(data *pb.SyncData, curMapping pb.SyncMapping) {
+func (s *store) exclude(data *pb.SyncData, curMappings []*pb.SyncMapping) {
 	services := make([]*pb.SyncService, 0, 10)
 	for _, svc := range data.Services {
-		svc.Instances = s.excludeInstances(svc.Instances, curMapping)
+		svc.Instances = s.excludeInstances(svc.Instances, curMappings)
 		services = append(services, svc)
 	}
 	data.Services = services
 }
 
 // excludeInstances find out the instance data belonging to self, through the mapping table
-func (s *store) excludeInstances(ins []*scpb.MicroServiceInstance, curMapping pb.SyncMapping) []*scpb.MicroServiceInstance {
+func (s *store) excludeInstances(ins []*scpb.MicroServiceInstance, curMappings []*pb.SyncMapping) []*scpb.MicroServiceInstance {
 	nis := make([]*scpb.MicroServiceInstance, 0, len(ins))
 	for _, inst := range ins {
-		if index := curMapping.CurrentIndex(inst.InstanceId); index != -1 {
-			continue
+		skip := false
+		for _, val := range curMappings {
+			if val.CurInstanceID == inst.InstanceId {
+				skip = true
+				break
+			}
 		}
-		nis = append(nis, inst)
+		if !skip {
+			nis = append(nis, inst)
+		}
 	}
 	return nis
 }

@@ -26,8 +26,8 @@ import (
 
 // Store interface of datacenter
 type DataCenter interface {
-	GetSyncData(allMapping pb.SyncMapping) (*pb.SyncData, error)
-	SetSyncData(*pb.SyncData, pb.SyncMapping) (pb.SyncMapping, error)
+	GetSyncData(allMappings []*pb.SyncMapping) (*pb.SyncData, error)
+	SetSyncData(*pb.SyncData, []*pb.SyncMapping) ([]*pb.SyncMapping, error)
 }
 
 type store struct {
@@ -47,17 +47,17 @@ func NewDataCenter(endpoints []string) (DataCenter, error) {
 }
 
 // GetSyncData Get data from datacenter instance, excluded the data from other syncer
-func (s *store) GetSyncData(allMapping pb.SyncMapping) (*pb.SyncData, error) {
+func (s *store) GetSyncData(allMappings []*pb.SyncMapping) (*pb.SyncData, error) {
 	data, err := s.datacenter.GetAll(context.Background())
 	if err != nil {
 		log.Errorf(err, "Syncer discover instances failed")
 		return nil, err
 	}
-	s.exclude(data, allMapping)
+	s.exclude(data, allMappings)
 	return data, nil
 }
 
 // GetSyncData Get current datacenter information
-func (s *store) SetSyncData(data *pb.SyncData, mapping pb.SyncMapping) (pb.SyncMapping, error) {
-	return s.sync(data, mapping)
+func (s *store) SetSyncData(data *pb.SyncData, mappings []*pb.SyncMapping) ([]*pb.SyncMapping, error) {
+	return s.sync(data, mappings)
 }

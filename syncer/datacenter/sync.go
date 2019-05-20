@@ -24,32 +24,37 @@ import (
 )
 
 // sync synchronize information from other datacenters
-func (s *store) sync(data *pb.SyncData, curMapping pb.SyncMapping) (pb.SyncMapping, error) {
-	orgMapping, curMapping := s.syncServiceInstances(data.Services, curMapping)
-	return s.deleteInstances(orgMapping, curMapping), nil
+func (s *store) sync(data *pb.SyncData, curMappings []*pb.SyncMapping) ([]*pb.SyncMapping, error) {
+	orgMappings, curMappings := s.syncServiceInstances(data.Services, curMappings)
+	return s.deleteInstances(orgMappings, curMappings), nil
 }
 
 // syncServiceInstances register instances from other datacenter
-func (s *store) syncServiceInstances(services []*pb.SyncService, curMapping pb.SyncMapping) (pb.SyncMapping, pb.SyncMapping) {
+func (s *store) syncServiceInstances(services []*pb.SyncService, curMappings []*pb.SyncMapping) ([]*pb.SyncMapping, []*pb.SyncMapping) {
 	var err error
 	ctx := context.Background()
-	orgMapping := make([]*pb.MappingItem, 0, 10)
+	orgMappings := make([]*pb.SyncMapping, 0, 10)
 
 	for _, svc := range services {
 		curServiceID := ""
 		for _, inst := range svc.Instances {
-			var item *pb.MappingItem
 
 			// Send an instance heartbeat if the instance has already been registered
-			if index := curMapping.OriginIndex(inst.InstanceId); index != -1 {
-				item = curMapping[index]
-				curServiceID = item.CurServiceID
-				err = s.datacenter.Heartbeat(ctx, item.DomainProject, item.CurServiceID, item.CurInstanceID)
-				if err != nil {
-					log.Errorf(err, "Syncer heartbeat instance failed")
-				} else {
-					orgMapping = append(orgMapping, item)
+			skip := false
+			for _, val := range curMappings {
+				if val.OrgInstanceID == inst.InstanceId {
+					curServiceID = val.CurServiceID
+					err = s.datacenter.Heartbeat(ctx, val.DomainProject, val.CurServiceID, val.CurInstanceID)
+					if err != nil {
+						log.Errorf(err, "Syncer heartbeat instance failed")
+					} else {
+						orgMappings = append(orgMappings, val)
+					}
+					skip = true
+					break
 				}
+			}
+			if skip {
 				continue
 			}
 
@@ -65,7 +70,7 @@ func (s *store) syncServiceInstances(services []*pb.SyncService, curMapping pb.S
 				}
 			}
 			// Register instance information when the instance does not exist
-			item = &pb.MappingItem{
+			item := &pb.SyncMapping{
 				DomainProject: svc.DomainProject,
 				OrgServiceID:  inst.ServiceId,
 				OrgInstanceID: inst.InstanceId,
@@ -80,32 +85,38 @@ func (s *store) syncServiceInstances(services []*pb.SyncService, curMapping pb.S
 			}
 
 			item.CurInstanceID = curInstanceID
-			orgMapping = append(orgMapping, item)
-			curMapping = append(curMapping, item)
+			orgMappings = append(orgMappings, item)
+			curMappings = append(curMappings, item)
 		}
 	}
-	return orgMapping, curMapping
+	return orgMappings, curMappings
 }
 
 // deleteInstances Unregister instances of mapping table that has been unregistered from other datacenter
-func (s *store) deleteInstances(orgMapping, curMapping pb.SyncMapping) pb.SyncMapping {
+func (s *store) deleteInstances(orgMappings, curMappings []*pb.SyncMapping) []*pb.SyncMapping {
 	l := 0
-	ol := len(orgMapping)
-	cl := len(curMapping)
+	ol := len(orgMappings)
+	cl := len(curMappings)
 	if ol < cl {
 		l = cl - ol
 	} else {
 		l = ol - cl
 	}
 	if l == 0 {
-		return curMapping
+		return curMappings
 	}
 
 	ctx := context.Background()
-	nm := make(pb.SyncMapping, 0, l)
-	for _, val := range curMapping {
-		if index := orgMapping.CurrentIndex(val.CurInstanceID); index != -1 {
-			nm = append(nm, val)
+	nm := make([]*pb.SyncMapping, 0, l)
+	for _, val := range curMappings {
+		skip := false
+		for _, org := range orgMappings {
+			if val.CurInstanceID == org.CurInstanceID {
+				skip = true
+				break
+			}
+		}
+		if skip {
 			continue
 		}
 

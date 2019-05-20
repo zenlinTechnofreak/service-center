@@ -57,7 +57,7 @@ func TestOnEvent(t *testing.T) {
 		return
 	}
 
-	mapping := pb.SyncMapping{}
+	mapping := make([]*pb.SyncMapping, 0, 10)
 
 	dcmock.SetGetAll(func(ctx context.Context) (data *pb.SyncData, e error) {
 		return nil, errors.New("test error")
@@ -120,7 +120,7 @@ func TestOnEventWrongData(t *testing.T) {
 		return
 	}
 
-	mapping := pb.SyncMapping{}
+	mapping := make([]*pb.SyncMapping, 0, 10)
 	data, err := dc.GetSyncData(mapping)
 	if err != nil {
 		t.Fatal(err)
