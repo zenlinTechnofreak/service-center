@@ -36,7 +36,7 @@ func (s *datacenter) heartbeatInstances(mapping pb.SyncMapping, instance *scpb.M
 	if err != nil {
 		log.Errorf(err, "Datacenter heartbeat instance failed")
 	}
-	log.Debugf("Instance %s is already exist, sent heartbeat to service-center")
+	log.Debugf("Instance %s is already exist, sent heartbeat to service-center", item.OrgInstanceID)
 	instance.InstanceId = item.CurInstanceID
 	return true
 }

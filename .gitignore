@@ -20,6 +20,7 @@ vendor/**
 **/conf/
 data
 !etc/conf/
+syncer-data
 frontend/app/bower_components
 etc/data/
 etc/ssl/

@@ -88,7 +88,7 @@ func (s *datacenter) Registry(nodeName string, data *pb.SyncData) {
 
 			// If inst is not in the mapping, that is because this the first time syncer get the instance data
 			// in this case, we should registry it to the datacenter and get the new instanceID
-			item := &pb.MappingItem{
+			item := &pb.MappingEntry{
 				DomainProject: svc.DomainProject,
 				OrgServiceID:  inst.ServiceId,
 				OrgInstanceID: inst.InstanceId,
